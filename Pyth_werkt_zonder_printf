@@ -1,0 +1,287 @@
+TaskHandle_t Task1;
+TaskHandle_t Task2;
+TaskHandle_t pythy;
+
+//--------------------------------------------------------------------------------------------------------------------
+float MotorLinksOutput = 0;
+float MotorRechtsOutput = 0;
+
+int DraairichtingLinks = 0;
+int DraairichtingRechts = 0;
+
+float MotorLinksMs = 0;
+float MotorRechtsMs = 0;
+//---------------------------------------------------------------------------------------------------------------------
+const int dir = 21;
+const int step = 19;
+const int dir1 = 26;
+const int step1 = 25;
+
+void setup() {
+  Serial.begin(9600); 
+  pinMode(step, OUTPUT);
+  pinMode(dir, OUTPUT);
+  pinMode(step1, OUTPUT);
+  pinMode(dir1, OUTPUT);
+
+  xTaskCreatePinnedToCore(
+                    Task1code,   /* Task function. */
+                    "Task1",     /* name of task. */
+                    10000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &Task1,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 0 */                  
+
+  //create a task that will be executed in the Task2code() function, with priority 1 and executed on core 1
+  xTaskCreatePinnedToCore(
+                    Task2code,   /* Task function. */
+                    "Task2",     /* name of task. */
+                    10000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &Task2,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 1 */
+  
+  xTaskCreatePinnedToCore(
+                    pythagoras,   /* Task function. */
+                    "pythy",     /* name of task. */
+                    10000,       /* Stack size of task */
+                    NULL,        /* parameter of the task */
+                    1,           /* priority of the task */
+                    &pythy,      /* Task handle to keep track of created task */
+                    0);          /* pin task to core 0 */   
+}
+
+void pythagoras(void * pvParameters)
+{
+  const int x = 40;
+  const int y = 100;
+  const int stift = 3;
+  const int bordXtot = 956;
+  
+  int richting = 0;
+  
+  int X1 = 150;
+  int Y1 = 167;
+  int X2 = 200;
+  int Y2 = 197;
+  
+  long X1mm = 0;
+  long Y1mm = 0;
+  long X2mm = 0;
+  long Y2mm = 0;
+  
+  long SL1 = 0;
+  long SL2 = 0;
+  long SR1 = 0;
+  long SR2 = 0;
+  
+  long S_Verschil_L = 0;
+  long S_Verschil_R = 0;
+
+  long mm_naar_steps_L = 0;
+  long mm_naar_steps_R = 0;
+
+  Serial.begin(9600);
+   
+  X1mm = X1*stift+x;
+  Y1mm = Y1*stift+y;
+  X2mm = X2*stift+x;
+  Y2mm = Y2*stift+y;
+
+  SL1 = sqrt(X1mm*X1mm + Y1mm*Y1mm);
+  SL2 = sqrt(X2mm*X2mm + Y2mm*Y2mm);
+  SR1 = sqrt(((bordXtot - X1mm)*(bordXtot - X1mm)) + (Y1mm*Y1mm));  
+  SR2 = sqrt((Y2mm*Y2mm) + ((bordXtot - X2mm)*(bordXtot - X2mm)));
+
+  // omhoog
+  if(X1 == X2 && Y1 > Y2)
+  {
+    richting = 1;
+  }
+
+  // schuin_rechts_omhoog
+  if(X2 > X1 && Y1 > Y2)
+  {
+    richting = 2;
+  }
+
+  // rechts
+  if(X2 > X1 && Y1 == Y2)
+  {
+    richting = 3;
+  }
+ 
+  // schuin rechts beneden
+  if(X2 > X1 && Y2 > Y1)
+  {
+    richting = 4;
+  }
+
+  // omlaag
+  if(X1 == X2 && Y2 > Y1)
+  {
+    richting = 5;
+  }
+
+  // schuin_links_omlaag
+  if(X1 > X2 && Y2 > Y1)
+  {
+    richting = 6;
+  }
+
+  // links
+  if(X1 > X2 && Y1 == Y2)
+  {
+    richting = 7;
+  }
+
+  // schuin_links_omhoog
+  if(X1 > X2 && Y1 > Y2)
+  {
+    richting = 8;
+  }
+  
+  switch(richting)
+  {
+    case 1: // omhoog
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;
+    break;
+    
+    case 2: // schuin_rechts_omhoog
+      S_Verschil_L = SL1 - SL2;
+      S_Verschil_R = SR2 - SR1; 
+    break;
+    
+    case 3: // rechts
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;       
+    break;
+    
+    case 4: // schuin_rechts_beneden
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;
+    break;
+    
+    case 5: // omlaag
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;       
+    break;
+    
+    case 6: // schuin_links_omlaag
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR1 - SR2;       
+    break;
+    
+    case 7: // links
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;       
+    break;
+    
+    case 8: // schuin_links_omhoog
+     S_Verschil_L = SL2 - SL1;
+     S_Verschil_R = SR2 - SR1;
+    break;
+    
+    default:
+    Serial.print("ERROR");
+    Serial.print('\n');
+    break;
+  }
+  
+  mm_naar_steps_L = S_Verschil_L / 0.25;
+  mm_naar_steps_R = S_Verschil_R / 0.25;
+  
+   if(mm_naar_steps_L < 0)
+  {
+    MotorLinksOutput = mm_naar_steps_L * -1;
+  }
+  else
+  {
+    MotorLinksOutput = mm_naar_steps_L;
+    Serial.print("Motor links = ");
+    Serial.println(MotorLinksOutput);
+  }
+
+  if(mm_naar_steps_R < 0)
+  {
+    MotorRechtsOutput = mm_naar_steps_R * -1;
+  }
+  else
+  {
+    MotorRechtsOutput = mm_naar_steps_R;
+  }
+
+  if(mm_naar_steps_L > 0)
+  {
+    DraairichtingLinks = 0;
+  }
+
+  if(mm_naar_steps_L < 0)
+  {
+    DraairichtingLinks = 1;
+  }
+
+  if(mm_naar_steps_R > 0)
+  {
+    DraairichtingRechts = 1;
+  }
+
+  if(mm_naar_steps_R < 0)
+  {
+    DraairichtingRechts = 0;
+  }
+
+  if(MotorLinksOutput > MotorRechtsOutput)
+  {
+    MotorLinksMs = 1000;
+    MotorRechtsMs = MotorLinksOutput / MotorRechtsOutput * 1000;
+  }
+
+  if(MotorRechtsOutput > MotorLinksOutput)
+  {
+    MotorLinksMs = MotorRechtsOutput / MotorLinksOutput * 1000;
+    MotorRechtsMs = 1000;
+  }
+//------------------------------------------------------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------------------------------------------------------
+  vTaskResume(Task1);
+  vTaskResume(Task2);
+  vTaskSuspend( NULL );
+}
+
+void Task1code( void * pvParameters ){
+    vTaskSuspend( NULL );
+    delay(1);
+    digitalWrite(dir, DraairichtingLinks); 
+    // Links
+    for(int i = 0; i < MotorLinksOutput; i++)
+    {
+      digitalWrite(step, 1);
+      delayMicroseconds(MotorLinksMs);
+      digitalWrite(step, 0);
+      delayMicroseconds(MotorLinksMs);
+    }
+    printf("hello");
+}
+
+void Task2code( void * pvParameters ){
+  vTaskSuspend( NULL );
+  delay(1);
+  digitalWrite(dir1, DraairichtingRechts);
+  for(int i = 0; i < MotorRechtsOutput; i++)
+  {
+    digitalWrite(step1, 1);
+    delayMicroseconds(MotorRechtsMs);
+    digitalWrite(step1, 0);
+    delayMicroseconds(MotorRechtsMs);
+  }
+  printf("Hello");
+}
+
+void loop() {
+    
+}
