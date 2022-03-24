@@ -201,8 +201,6 @@ void pythagoras(void * pvParameters)
   else
   {
     MotorLinksOutput = mm_naar_steps_L;
-    Serial.print("Motor links = ");
-    Serial.println(MotorLinksOutput);
   }
 
   if(mm_naar_steps_R < 0)
@@ -245,9 +243,7 @@ void pythagoras(void * pvParameters)
     MotorLinksMs = MotorRechtsOutput / MotorLinksOutput * 1000;
     MotorRechtsMs = 1000;
   }
-//------------------------------------------------------------------------------------------------------------------------------
-
-//------------------------------------------------------------------------------------------------------------------------------
+  
   vTaskResume(Task1);
   vTaskResume(Task2);
   vTaskSuspend( NULL );
@@ -282,6 +278,7 @@ void Task2code( void * pvParameters ){
   printf("Hello");
 }
 
-void loop() {
+void loop() 
+{
     
 }
