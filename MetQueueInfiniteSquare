@@ -1,0 +1,476 @@
+TaskHandle_t tweeDArray;
+TaskHandle_t pyt;
+TaskHandle_t motorR;
+TaskHandle_t motorL;
+//Data queue for motorRechts
+typedef struct{
+  int stepsRechts;
+  int milisecondenRechts;
+  int draaiRechts ;
+} motorRechts;
+
+//Data queue for motorLinks
+typedef struct{
+  int stepsLinks;
+  int milisecondenLinks;
+  int draaiLinks;
+} motorLinks;
+
+typedef struct{
+  int x1;
+  int y1;
+  int x2;
+  int y2;
+} coordinaten;
+
+//names of the queue's
+xQueueHandle xQueuemotorRechts;
+xQueueHandle xQueuemotorLinks;
+xQueueHandle xQueuecoordinaten;
+
+const int dir = 21;
+const int step = 19;
+const int dir1 = 26;
+const int step1 = 25;
+void setup() {
+
+  pinMode(step, OUTPUT);
+  pinMode(dir, OUTPUT);
+  pinMode(step1, OUTPUT);
+  pinMode(dir1, OUTPUT);
+
+  Serial.begin(112500);
+  // size of the queue's
+  xQueuemotorRechts = xQueueCreate(5, sizeof(motorRechts));
+  xQueuemotorLinks = xQueueCreate(5, sizeof(motorLinks));
+  xQueuecoordinaten = xQueueCreate(5, sizeof(coordinaten));
+
+    xTaskCreatePinnedToCore(
+      array,           /* Task function. */
+      "tweeDArray",        /* name of task. */
+      10000,       /* Stack size of task */
+      NULL,        /* parameter of the task */
+      1,           /* priority of the task */
+      &tweeDArray,      /* Task handle to keep track of created task */
+      0);          /* pin task to core 1 */
+
+  xTaskCreatePinnedToCore(
+      pythagoras,           /* Task function. */
+      "pyt",        /* name of task. */
+      10000,       /* Stack size of task */
+      NULL,        /* parameter of the task */
+      1,           /* priority of the task */
+      &pyt,      /* Task handle to keep track of created task */
+      1);          /* pin task to core 1 */
+
+  xTaskCreatePinnedToCore(
+      rechterMotor,           /* Task function. */
+      "motorR",        /* name of task. */
+      10000,       /* Stack size of task */
+      NULL,        /* parameter of the task */
+      1,           /* priority of the task */
+      &motorR,      /* Task handle to keep track of created task */
+      1);          /* pin task to core 1 */
+
+  xTaskCreatePinnedToCore(
+      linkerMotor,           /* Task function. */
+      "motorL",        /* name of task. */
+      10000,       /* Stack size of task */
+      NULL,        /* parameter of the task */
+      1,           /* priority of the task */
+      &motorL,      /* Task handle to keep track of created task */
+      0);          /* pin task to core 1 */
+}
+
+void array (void * pvParameters )
+{
+  /* keep the status of sending data */
+  BaseType_t xStatus;
+  /* time to block the task until the queue has free space */
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+  /* create data to send */
+  coordinaten coordinaten;
+  /* sender 1 has id is 1 */
+
+
+  int plaatje[10][10]=
+    {
+        {1,1,1,1,1,1,1,1,1,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,1},
+        {1,1,1,1,1,1,1,1,1,1}
+    };
+
+    for (int y = 0; y < 9; y++)
+    {
+        for(int x = 0; x < 9; x++)
+        {
+          if (plaatje[y][x] == 1)
+          { 
+            if (plaatje[y][x+1] == 1);
+              coordinaten.x1 = x;
+              coordinaten.y1 = y;
+              coordinaten.x2 = x+1;
+              coordinaten.y2 = y;
+
+            if(plaatje[y+1][x+1])
+            {
+              coordinaten.x1 = x;
+              coordinaten.y1 = y;
+              coordinaten.x2 = x+1;
+              coordinaten.y2 = y+1;
+            }
+
+            if(plaatje[y+1][x])
+            {
+              coordinaten.x1 = x;
+              coordinaten.y1 = y;
+              coordinaten.x2 = x;
+              coordinaten.y2 = y+1;
+            }
+            
+            if(plaatje[x-1][y])
+            {
+              coordinaten.x1 = x;
+              coordinaten.y1 = y;
+              coordinaten.x2 = x-1;
+              coordinaten.y2 = y;
+            }
+            
+            if(plaatjex[x][y-1])
+            {
+              coordinaten.x1 = x;
+              coordinaten.y1 = y;
+              coordinaten.x2 = x;
+              coordinaten.y2 = y-1;
+            }
+              Serial.println(coordinaten.x1);
+              Serial.println(coordinaten.y1);
+              Serial.println(coordinaten.x2);
+              Serial.println(coordinaten.y2);
+              xStatus = xQueueSendToFront( xQueuecoordinaten, &coordinaten, xTicksToWait );
+              delay(1000);
+          }
+        }
+    }
+  
+    /* send data to front of the queue */
+    xStatus = xQueueSendToFront( xQueuecoordinaten, &coordinaten, xTicksToWait );
+
+    delay(1000);
+
+  vTaskDelete( NULL );
+}
+
+
+void pythagoras( void * pvParameters )
+{
+  /* keep the status of receiving data */
+  BaseType_t xStatus;
+  /* time to block the task until data is available */
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+  coordinaten coordinaten;
+    /* receive data from the queue */
+
+    for(;;){
+
+    xStatus = xQueueReceive( xQueuecoordinaten, &coordinaten, xTicksToWait );
+
+       
+    /* check whether receiving is ok or not */
+    if(xStatus == pdPASS)
+    {
+
+  float MotorLinksOutput = 0;
+  float MotorRechtsOutput = 0;
+    
+  int DraairichtingLinks = 0;
+  int DraairichtingRechts = 0;
+
+  float MotorLinksMs = 0;
+  float MotorRechtsMs = 0;
+
+  const int x = 40;
+  const int y = 100;
+  const int stift = 3;
+  const int bordXtot = 956;
+  
+  int richting = 0;
+  
+  int X1 = coordinaten.x1;
+  int Y1 = coordinaten.y1;
+  int X2 = coordinaten.x2;
+  int Y2 = coordinaten.y2;
+  
+  long X1mm = 0;
+  long Y1mm = 0;
+  long X2mm = 0;
+  long Y2mm = 0;
+  
+  long SL1 = 0;
+  long SL2 = 0;
+  long SR1 = 0;
+  long SR2 = 0;
+  
+  long S_Verschil_L = 0;
+  long S_Verschil_R = 0;
+
+  long mm_naar_steps_L = 0;
+  long mm_naar_steps_R = 0;
+
+  Serial.begin(9600);
+   
+  X1mm = X1*stift+x;
+  Y1mm = Y1*stift+y;
+  X2mm = X2*stift+x;
+  Y2mm = Y2*stift+y;
+
+  SL1 = sqrt(X1mm*X1mm + Y1mm*Y1mm);
+  SL2 = sqrt(X2mm*X2mm + Y2mm*Y2mm);
+  SR1 = sqrt(((bordXtot - X1mm)*(bordXtot - X1mm)) + (Y1mm*Y1mm));  
+  SR2 = sqrt((Y2mm*Y2mm) + ((bordXtot - X2mm)*(bordXtot - X2mm)));
+
+  // omhoog
+  if(X1 == X2 && Y1 > Y2)
+  {
+    richting = 1;
+  }
+
+  // schuin_rechts_omhoog
+  if(X2 > X1 && Y1 > Y2)
+  {
+    richting = 2;
+  }
+
+  // rechts
+  if(X2 > X1 && Y1 == Y2)
+  {
+    richting = 3;
+  }
+ 
+  // schuin rechts beneden
+  if(X2 > X1 && Y2 > Y1)
+  {
+    richting = 4;
+  }
+
+  // omlaag
+  if(X1 == X2 && Y2 > Y1)
+  {
+    richting = 5;
+  }
+
+  // schuin_links_omlaag
+  if(X1 > X2 && Y2 > Y1)
+  {
+    richting = 6;
+  }
+
+  // links
+  if(X1 > X2 && Y1 == Y2)
+  {
+    richting = 7;
+  }
+
+  // schuin_links_omhoog
+  if(X1 > X2 && Y1 > Y2)
+  {
+    richting = 8;
+  }
+  
+  switch(richting)
+  {
+    case 1: // omhoog
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;
+    break;
+    
+    case 2: // schuin_rechts_omhoog
+      S_Verschil_L = SL1 - SL2;
+      S_Verschil_R = SR2 - SR1; 
+    break;
+    
+    case 3: // rechts
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;       
+    break;
+    
+    case 4: // schuin_rechts_beneden
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;
+    break;
+    
+    case 5: // omlaag
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;       
+    break;
+    
+    case 6: // schuin_links_omlaag
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR1 - SR2;       
+    break;
+    
+    case 7: // links
+      S_Verschil_L = SL2 - SL1;
+      S_Verschil_R = SR2 - SR1;       
+    break;
+    
+    case 8: // schuin_links_omhoog
+     S_Verschil_L = SL2 - SL1;
+     S_Verschil_R = SR2 - SR1;
+    break;
+    
+    default:
+    Serial.print("ERROR");
+    Serial.print('\n');
+    break;
+  }
+  
+  mm_naar_steps_L = S_Verschil_L / 0.25;
+  mm_naar_steps_R = S_Verschil_R / 0.25;
+  
+   if(mm_naar_steps_L < 0)
+  {
+    MotorLinksOutput = mm_naar_steps_L * -1;
+  }
+  else
+  {
+    MotorLinksOutput = mm_naar_steps_L;
+  }
+
+  if(mm_naar_steps_R < 0)
+  {
+    MotorRechtsOutput = mm_naar_steps_R * -1;
+  }
+  else
+  {
+    MotorRechtsOutput = mm_naar_steps_R;
+  }
+
+  if(mm_naar_steps_L > 0)
+  {
+    DraairichtingLinks = 0;
+  }
+
+  if(mm_naar_steps_L < 0)
+  {
+    DraairichtingLinks = 1;
+  }
+
+  if(mm_naar_steps_R > 0)
+  {
+    DraairichtingRechts = 1;
+  }
+
+  if(mm_naar_steps_R < 0)
+  {
+    DraairichtingRechts = 0;
+  }
+
+  if(MotorLinksOutput > MotorRechtsOutput)
+  {
+    MotorLinksMs = 1000;
+    MotorRechtsMs = MotorLinksOutput / MotorRechtsOutput * 1000;
+  }
+
+  if(MotorRechtsOutput > MotorLinksOutput)
+  {
+    MotorLinksMs = MotorRechtsOutput / MotorLinksOutput * 1000;
+    MotorRechtsMs = 1000;
+  }
+  
+//------------------------------------------------------------------------------------------------    
+  /* keep the status of sending data */
+  BaseType_t xStatus;
+  /* time to block the task until the queue has free space */
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+  /* create data to send */
+  motorRechts motorRechts;
+  motorLinks motorLinks;
+  /* sender 1 has id is 1 */
+  motorRechts.stepsRechts = MotorRechtsOutput;
+  motorRechts.milisecondenRechts = MotorRechtsMs;
+  motorRechts.draaiRechts = DraairichtingRechts;
+
+  motorLinks.stepsLinks = MotorLinksOutput;
+  motorLinks.milisecondenLinks = MotorLinksMs;
+  motorLinks.draaiLinks = DraairichtingLinks;
+  
+    /* send data to front of the queue */
+    xStatus = xQueueSendToFront( xQueuemotorRechts, &motorRechts, xTicksToWait );
+    xStatus = xQueueSendToFront( xQueuemotorLinks, &motorLinks, xTicksToWait );
+
+    delay(1000);
+  
+    }
+
+  }
+  vTaskDelete( NULL );
+}
+
+void rechterMotor( void * pvParameters )
+{
+  /* keep the status of receiving data */
+  BaseType_t xStatus;
+  /* time to block the task until data is available */
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+  motorRechts motorRechts;
+  for(;;){
+    /* receive data from the queue */
+    xStatus = xQueueReceive( xQueuemotorRechts, &motorRechts, xTicksToWait );
+
+       
+    /* check whether receiving is ok or not */
+    if(xStatus == pdPASS)
+    {
+      digitalWrite(dir1, motorRechts.draaiRechts);
+      for(int i = 0; i < motorRechts.stepsRechts; i++)
+      {
+        digitalWrite(step1, 1);
+        delayMicroseconds(motorRechts.milisecondenRechts);
+        digitalWrite(step1, 0);
+        delayMicroseconds(motorRechts.milisecondenRechts);
+      }
+      delay(100);
+    }
+
+  }
+  vTaskDelete( NULL );
+}
+
+void linkerMotor( void * pvParameters )
+{
+  /* keep the status of receiving data */
+  BaseType_t xStatus;
+  /* time to block the task until data is available */
+  const TickType_t xTicksToWait = pdMS_TO_TICKS(100);
+  motorLinks motorLinks;
+  for(;;){
+    /* receive data from the queue */
+    xStatus = xQueueReceive( xQueuemotorLinks, &motorLinks, xTicksToWait );
+    if(xStatus == pdPASS)
+    {
+      digitalWrite(dir, motorLinks.draaiLinks); 
+      for(int i = 0; i < motorLinks.stepsLinks; i++)
+      {
+        digitalWrite(step, 1);
+        delayMicroseconds(motorLinks.milisecondenLinks);
+        digitalWrite(step, 0);
+        delayMicroseconds(motorLinks.milisecondenLinks);
+      }
+      delay(100);
+    }
+  }
+  vTaskDelete( NULL );
+}
+
+void loop() 
+{
+
+}
