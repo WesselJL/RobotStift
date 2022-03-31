@@ -143,7 +143,7 @@ void array (void * pvParameters )
               coordinaten.y2 = y;
             }
             
-            if(plaatjex[x][y-1])
+            if(plaatje[x][y-1])
             {
               coordinaten.x1 = x;
               coordinaten.y1 = y;
